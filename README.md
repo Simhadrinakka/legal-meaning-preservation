@@ -30,20 +30,20 @@ This template contains **300 unique statutory passages** (150 English, 150 Hindi
 | `act_id` | Act identifier | Code for the enactment (e.g., `2006_4`, `2007_56`, `1969_18`, `1976_19`, `2008_34`). *(Pre-filled)* |
 | `original_text` | Source passage | Unaltered statutory text from the official legislation. *(Pre-filled)* |
 | `simplified_text` | Plain-language version | Enter the plain-language simplified version of the legal passage. Ensure it remains legally sound. |
-| `lmp_score` | Meaning Preservation Score | Integer scale from **1 to 5** evaluating fidelity of legal meaning (see Scoring Scale below). |
-| `error_type` | Discrepancy taxonomy | Categorize the primary legal error if `lmp_score` < 5 (see Error Taxonomy below). If score is 5, set to `NONE`. |
+| `lmp_score` | Meaning Preservation Score | Numeric scale from **1.0 to 10.0** evaluating fidelity of legal meaning (see Scoring Scale below). |
+| `error_type` | Discrepancy taxonomy | Categorize the primary legal error if `lmp_score` < 9.0 (see Error Taxonomy below). If score is 9.0+, set to `NONE`. |
 | `annotation_notes` | Qualitative justification | Brief explanation highlighting why points were deducted or which legal nuance was lost/preserved. |
 | `annotator_id` | Annotator tag | Unique identifier of the legal annotator (e.g., `ANN_01`, `ANN_02`). |
 
-### LMP Scoring Scale (1 to 5)
-- **5 (Perfect Preservation):** Full semantic and legal equivalence. All rights, duties, conditions, and penalties remain intact.
-- **4 (Minor Semantic Drift):** Minor syntactic changes or slight vocabulary dilution that does **not** alter legal outcomes or rights/obligations.
-- **3 (Moderate Loss):** Ambiguous rephrasing of conditions or obligations that creates interpretative uncertainty.
-- **2 (Significant Distortion):** Deletion of an exception, weakening of a mandatory command ("shall" $\rightarrow$ "may"), or change in statutory scope.
-- **1 (Critical Failure):** Direct contradiction of the law, inverted liability, omitted criminal penalty, or fabricated legal right.
+### LMP Scoring Scale (1 to 10)
+- **9.0 – 10.0 (Perfect Preservation):** Complete semantic and normative legal equivalence. All rights, duties, deontic modals, exceptions, conditions, and penalties remain strictly intact.
+- **7.0 – 8.9 (Minor Semantic Drift):** Minor syntactic rephrasing or stylistic simplification with zero alteration to legal standing, rights, or obligations.
+- **5.0 – 6.9 (Moderate Loss):** Ambiguous rephrasing of statutory conditions or obligations that creates interpretative uncertainty.
+- **3.0 – 4.9 (Significant Distortion):** Omission of a statutory proviso, alteration of a mandatory command ("shall" $\rightarrow$ "may"), or distortion of procedural scope.
+- **1.0 – 2.9 (Critical Failure):** Direct contradiction of the statute, inverted legal liability, omitted criminal sanctions, or introduction of non-existent legal rights.
 
 ### Error Taxonomy (`error_type`)
-- `NONE`: No legal distortion (used when `lmp_score` = 5).
+- `NONE`: No legal distortion (used when `lmp_score` >= 9.0).
 - `MODAL_DRIFT`: Inappropriate change of deontic modality (e.g., changing mandatory "shall" to permissive "may" or "should").
 - `CONDITION_OMISSION`: Dropping provisos, statutory preconditions, or jurisdictional exceptions (e.g., omitting "except the State of Jammu and Kashmir").
 - `ENTITY_DISTORTION`: Inaccurate legal terms, officer designations, or institutional names (e.g., mistranslating "Court of Session").
