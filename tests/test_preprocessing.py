@@ -20,12 +20,17 @@ import pandas as pd
 
 # Import the module under test
 from training.preprocessing import (
+    AI_DRAFT_REQUIRED_COLUMNS,
+    DECISION_TO_ID,
+    ERROR_TYPE_TO_ID,
     MAX_LMP_SCORE,
     MIN_LMP_SCORE,
     REQUIRED_COLUMNS,
     VALID_LANGUAGES,
+    add_supervision_targets,
     normalize_dataframe,
     normalize_text,
+    save_processed_splits,
     split_dataset,
     validate_annotation_dataset,
 )
@@ -287,6 +292,161 @@ class TestDatasetSplitting(unittest.TestCase):
                 self.test_df, train_ratio=0.80, val_ratio=0.20, test_ratio=0.10
             )
         self.assertIn("Split ratios must sum to 1.0", str(ctx.exception))
+
+
+class TestAIDraftPreprocessing(unittest.TestCase):
+    """
+    Test cases for AI-draft dataset validation, supervision target generation,
+    NEEDS_REVIEW handling, sample weighting, and clean training splits.
+    """
+
+    def setUp(self):
+        # Create a valid synthetic AI draft DataFrame
+        self.valid_ai_df = pd.DataFrame(
+            [
+                {
+                    "pair_id": "LMP_EN_001",
+                    "language": "EN",
+                    "act_id": "1969_18",
+                    "original_text": "Section 1 shall apply to the whole of India.",
+                    "simplified_text": "Section 1 applies across all of India.",
+                    "context_note": "Preliminary jurisdiction",
+                    "simplification_status": "SIMPLIFIED",
+                    "ai_lmp_score": 9,
+                    "ai_preservation_decision": "PRESERVED",
+                    "ai_error_type": "NONE",
+                    "ai_explanation": "All legal obligations and scope preserved.",
+                    "ai_confidence": "HIGH",
+                    "human_lmp_score": "",
+                    "human_error_type": "",
+                    "human_explanation": "",
+                    "annotation_status": "AI_DRAFTED",
+                },
+                {
+                    "pair_id": "LMP_HI_001",
+                    "language": "HI",
+                    "act_id": "1969_18",
+                    "original_text": "धारा 1 संपूर्ण भारत पर लागू होगी।",
+                    "simplified_text": "धारा 1 पूरे भारत पर लागू होती है।",
+                    "context_note": "प्रारंभिक क्षेत्राधिकार",
+                    "simplification_status": "NEEDS_REVIEW",
+                    "ai_lmp_score": 8,
+                    "ai_preservation_decision": "MOSTLY_PRESERVED",
+                    "ai_error_type": "SCOPE_CHANGE",
+                    "ai_explanation": "मामूली शब्दावली परिवर्तन।",
+                    "ai_confidence": "MEDIUM",
+                    "human_lmp_score": "",
+                    "human_error_type": "",
+                    "human_explanation": "",
+                    "annotation_status": "AI_DRAFTED",
+                },
+            ]
+        )
+
+    def test_valid_ai_draft_validation(self):
+        summary = validate_annotation_dataset(self.valid_ai_df)
+        self.assertEqual(summary["status"], "PASSED")
+        self.assertEqual(summary["schema_type"], "ai_draft")
+        self.assertEqual(summary["total_records"], 2)
+        self.assertEqual(summary["simplified_count"], 1)
+        self.assertEqual(summary["needs_review_count"], 1)
+        self.assertEqual(summary["human_fields_status"], "VERIFIED_BLANK")
+
+    def test_ai_draft_populated_human_fields_fails(self):
+        bad_df = self.valid_ai_df.copy()
+        bad_df.loc[0, "human_lmp_score"] = 9.0  # Must be blank in AI draft
+        with self.assertRaises(ValueError) as ctx:
+            validate_annotation_dataset(bad_df)
+        self.assertIn("Human annotation columns must remain blank", str(ctx.exception))
+
+    def test_ai_draft_invalid_error_type_fails(self):
+        bad_df = self.valid_ai_df.copy()
+        bad_df.loc[0, "ai_error_type"] = "UNKNOWN_ERROR"
+        with self.assertRaises(ValueError) as ctx:
+            validate_annotation_dataset(bad_df)
+        self.assertIn("Invalid ai_error_type found", str(ctx.exception))
+
+    def test_supervision_targets_generation(self):
+        df_targets = add_supervision_targets(self.valid_ai_df)
+        # Check generated target columns exist
+        expected_cols = [
+            "ai_supervision_score",
+            "ai_supervision_score_norm",
+            "ai_supervision_decision_id",
+            "ai_supervision_error_id",
+            "is_ai_preserved",
+            "target_score",
+            "target_score_norm",
+            "target_decision_id",
+            "target_error_id",
+            "is_preserved",
+            "is_needs_review",
+            "is_primary_train",
+            "sample_weight_clean",
+            "sample_weight_soft",
+        ]
+        for col in expected_cols:
+            self.assertIn(col, df_targets.columns)
+
+        # Check values for row 0 (SIMPLIFIED, HIGH, score 9)
+        row0 = df_targets.iloc[0]
+        self.assertEqual(row0["target_score"], 9.0)
+        self.assertEqual(row0["target_score_norm"], 0.9)
+        self.assertEqual(row0["target_decision_id"], DECISION_TO_ID["PRESERVED"])
+        self.assertEqual(row0["target_error_id"], ERROR_TYPE_TO_ID["NONE"])
+        self.assertEqual(row0["is_preserved"], 1)
+        self.assertFalse(row0["is_needs_review"])
+        self.assertTrue(row0["is_primary_train"])
+        self.assertEqual(row0["sample_weight_clean"], 1.0)
+        self.assertEqual(row0["sample_weight_soft"], 1.0)  # HIGH (1.0) * SIMPLIFIED (1.0)
+
+        # Check values for row 1 (NEEDS_REVIEW, MEDIUM, score 8)
+        row1 = df_targets.iloc[1]
+        self.assertEqual(row1["target_score"], 8.0)
+        self.assertEqual(row1["target_score_norm"], 0.8)
+        self.assertEqual(row1["target_decision_id"], DECISION_TO_ID["MOSTLY_PRESERVED"])
+        self.assertEqual(row1["target_error_id"], ERROR_TYPE_TO_ID["SCOPE_CHANGE"])
+        self.assertEqual(row1["is_preserved"], 0)
+        self.assertTrue(row1["is_needs_review"])
+        self.assertFalse(row1["is_primary_train"])
+        self.assertEqual(row1["sample_weight_clean"], 0.0)  # Excluded under clean
+        self.assertAlmostEqual(row1["sample_weight_soft"], 0.85 * 0.50, places=3)  # MEDIUM * NEEDS_REVIEW
+
+    def test_clean_train_saving(self):
+        import tempfile
+        df_targets = add_supervision_targets(self.valid_ai_df)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            meta = {
+                "supervision_metadata": {"is_human_gold": False},
+                "total_records": 2,
+            }
+            paths = save_processed_splits(
+                train_df=df_targets,
+                val_df=df_targets.iloc[:1],
+                test_df=df_targets.iloc[1:],
+                full_df=df_targets,
+                output_dir=Path(tmpdir),
+                metadata=meta,
+            )
+            self.assertTrue(paths["train_clean"].exists())
+            clean_saved = pd.read_csv(paths["train_clean"])
+            # Only row 0 was SIMPLIFIED / is_primary_train=True
+            self.assertEqual(len(clean_saved), 1)
+            self.assertEqual(clean_saved.iloc[0]["pair_id"], "LMP_EN_001")
+
+    def test_valid_ai_audited_validation(self):
+        audited_df = self.valid_ai_df.copy()
+        audited_df["annotation_status"] = "AI_AUDITED"
+        summary = validate_annotation_dataset(audited_df)
+        self.assertEqual(summary["status"], "PASSED")
+        self.assertEqual(summary["schema_type"], "ai_audited")
+
+    def test_invalid_annotation_status_fails(self):
+        bad_df = self.valid_ai_df.copy()
+        bad_df.loc[0, "annotation_status"] = "HUMAN_GOLD"  # Invalid status
+        with self.assertRaises(ValueError) as ctx:
+            validate_annotation_dataset(bad_df)
+        self.assertIn("Invalid annotation_status found", str(ctx.exception))
 
 
 if __name__ == "__main__":

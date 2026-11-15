@@ -34,7 +34,7 @@ ENV/
 env.bak/
 venv.bak/
 
-# Machine Learning model weights, checkpoints, and logs
+# Machine Learning model weights, checkpoints, tokenizers, and caches
 *.pt
 *.pth
 *.bin
@@ -48,12 +48,44 @@ checkpoints/
 runs/
 wandb/
 .tensorboard/
+.cache/
+huggingface/
+models/judgebert/judgebert_weights.pt
+models/judgebert/tokenizer.json
 
-# Data files (raw large datasets)
+# Archive and packaging formats
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Data files (raw source datasets & generated processed splits)
 data/raw/*
 !data/raw/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+
+# Intermediate and AI-generated annotation files (reproducible via training/ scripts)
+data/annotations/batches/
+data/annotations/simplification_batches/
+data/annotations/lmp_pilot_10.csv
+data/annotations/lmp_remaining_290.csv
+data/annotations/priority_human_review.csv
+data/annotations/lmp_ai_draft_300.csv
+data/annotations/lmp_ai_audited_300.csv
+
+# Temporary development, diagnostic, and interim batch scripts
+training/generate_batch_*.py
+training/verify_batch_*.py
+training/diagnose_*.py
+training/generate_ai_annotations.py
+training/create_annotation_draft.py
+training/audit_candidates.py
+training/audit_deep_scan.py
+training/generate_audit_report.py
+training/verify_master_300.py
 
 # Node.js / Frontend dependencies and builds
 node_modules/
@@ -79,6 +111,9 @@ Thumbs.db
 
 # Frontend build output
 dist/
+
+# Logs
+*.log
 
 # Python test/cache files
 .pytest_cache/

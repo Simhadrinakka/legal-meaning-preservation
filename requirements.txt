@@ -1,1 +1,27 @@
+# =============================================================================
+# Project: Explainable Multilingual Legal Meaning Preservation Using JUDGEBERT
+# Python Dependencies Specification
+# =============================================================================
 
+# Core Deep Learning & Transformers
+torch>=2.0.0
+transformers>=4.36.0
+tokenizers>=0.15.0
+accelerate>=0.25.0
+
+# Scientific Computing & Data Processing
+numpy>=1.24.0
+scipy>=1.10.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+
+# Visualization & Reporting
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Utilities & Progress Tracking
+tqdm>=4.65.0
+
+# Web API & Server
+flask>=3.0.0
+flask-cors>=4.0.0
