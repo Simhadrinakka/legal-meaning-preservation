@@ -76,6 +76,9 @@ data/annotations/priority_human_review.csv
 data/annotations/lmp_ai_draft_300.csv
 data/annotations/lmp_ai_audited_300.csv
 
+# Local research, audit, and evaluation reports
+reports/
+
 # Temporary development, diagnostic, and interim batch scripts
 training/generate_batch_*.py
 training/verify_batch_*.py
